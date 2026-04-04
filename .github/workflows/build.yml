@@ -1,0 +1,175 @@
+name: Build Phicomm K3 Firmware
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_artifact:
+        description: Upload firmware artifact
+        required: true
+        type: boolean
+        default: true
+
+      create_release:
+        description: Create GitHub release
+        required: true
+        type: boolean
+        default: true
+
+env:
+  REPO_URL: https://github.com/coolsnowwolf/lede
+  REPO_BRANCH: master
+  TZ: Asia/Shanghai
+
+jobs:
+  build:
+    name: Build Phicomm K3
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: "Source: Checkout"
+        uses: actions/checkout@v6
+
+      - name: "Profile: Load"
+        shell: bash
+        run: |
+          bash scripts/ci/profile.sh load-profile phicomm-k3
+
+      - name: "Runner: Cleanup"
+        shell: bash
+        run: |
+          df -hT
+          bash scripts/ci/runner.sh cleanup-runner
+          df -hT
+
+      - name: "Environment: Initialize"
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        shell: bash
+        run: |
+          bash scripts/ci/build.sh initialize-environment
+
+      - name: "Source: Prepare"
+        shell: bash
+        run: |
+          bash scripts/ci/build.sh prepare-source
+
+      - name: "Source: Apply Customization"
+        shell: bash
+        run: |
+          bash scripts/ci/build.sh apply-source-customization
+
+      - name: "Cache: Compute Keys"
+        shell: bash
+        run: |
+          bash scripts/ci/cache.sh compute-cache-keys
+
+      - name: "Cache: Restore Tools Host"
+        uses: actions/cache@v5
+        with:
+          path: |
+            openwrt/build_dir/host
+            openwrt/staging_dir/host
+          key: tools-host-${{ env.TOOL_HEAD }}
+
+      - name: "Cache: Restore Toolchain"
+        uses: actions/cache@v5
+        with:
+          path: |
+            openwrt/build_dir/toolchain-*
+            openwrt/staging_dir/toolchain-*
+          key: toolchain-${{ env.TARGET }}-${{ env.SUBTARGET }}-${{ env.TOOLCHAIN_HEAD }}
+
+      - name: "Cache: Restore Hostpkg"
+        uses: actions/cache@v5
+        with:
+          path: |
+            openwrt/build_dir/hostpkg
+            openwrt/staging_dir/hostpkg
+          key: hostpkg-lang-${{ env.LANG_HEAD }}
+
+      - name: "Cache: Restore Ccache"
+        uses: actions/cache@v5
+        with:
+          path: openwrt/.ccache
+          key: ccache-${{ env.DEVICE }}-${{ env.CCACHE_HASH }}
+          restore-keys: |
+            ccache-${{ env.DEVICE }}-
+            ccache-
+
+      - name: "Cache: Normalize Directories"
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          mkdir -p openwrt/.ccache
+          find openwrt/staging_dir openwrt/build_dir -type d -exec chmod u+rwx {} + 2>/dev/null || true
+          ccache -M 2G || true
+          ccache -s || true
+
+      - name: "Build: Download Sources"
+        shell: bash
+        run: |
+          bash scripts/ci/build.sh download-sources
+
+      - name: "Build: Firmware"
+        id: compile_firmware
+        continue-on-error: true
+        shell: bash
+        run: |
+          bash scripts/ci/build.sh build-firmware
+
+      - name: "Build: Firmware (Verbose Fallback)"
+        if: ${{ steps.compile_firmware.outcome == 'failure' && !cancelled() }}
+        shell: bash
+        run: |
+          bash scripts/ci/build.sh build-firmware-verbose
+
+      - name: "Artifacts: Collect Firmware"
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          bash scripts/ci/artifacts.sh collect-firmware
+
+      - name: "Artifacts: Upload Firmware"
+        if: ${{ success() && inputs.upload_artifact }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.FIRMWARE_DIR }}
+
+      - name: "Release: Prepare Metadata"
+        if: ${{ success() && inputs.create_release }}
+        shell: bash
+        run: |
+          bash scripts/ci/release.sh prepare-release-metadata
+
+      - name: "Release: Publish"
+        if: ${{ success() && inputs.create_release }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_NAME }}
+          body_path: ${{ env.RELEASE_BODY }}
+          files: ${{ env.FIRMWARE_DIR }}/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Maintenance: Prune Releases"
+        if: ${{ success() && inputs.create_release }}
+        uses: dev-drprasad/delete-older-releases@master
+        with:
+          keep_latest: 5
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Maintenance: Prune Workflow Runs"
+        if: ${{ !cancelled() }}
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 1
+          keep_minimum_runs: 3
