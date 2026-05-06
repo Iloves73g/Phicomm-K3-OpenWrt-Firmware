@@ -1,6 +1,10 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+echo "Skip original hooks"
+exit 0
 
-echo '>>> Update Passwall TProxy Dependencies >>>'
+##!/usr/bin/env bash
+#set -euo pipefail
+
+#echo '>>> Update Passwall TProxy Dependencies >>>'
 #sed -Ei 's/(^| )iptables-mod-socket( |$)/ /g; s/  +/ /g' package/lean/luci-app-passwall/root/usr/share/passwall/app.sh
-echo '<<< Completed Update Passwall TProxy Dependencies <<<'
+#echo '<<< Completed Update Passwall TProxy Dependencies <<<'
