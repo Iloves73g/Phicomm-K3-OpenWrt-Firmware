@@ -32,7 +32,7 @@ clone_repo 'https://github.com/openwrt-passwall/openwrt-passwall' 'main' 'packag
 echo '<<< Completed Clone Passwall Package <<<'
 
 echo '>>> Clone Argon Theme >>>'
-clone_repo 'https://github.com/jerrykuku/luci-theme-argon' '18.06' 'package/lean/luci-theme-argon'
+clone_repo 'https://github.com/jerrykuku/luci-theme-argon' 'master' 'package/lean/luci-theme-argon'
 echo '<<< Completed Clone Argon Theme <<<'
 
 echo '>>> Clone K3 Screen App >>>'
