@@ -86,7 +86,7 @@ apply_source_customization() {
 
   ./scripts/feeds install -a
 
-  run_if_exists "${profile_hooks_dir}/post-feeds-install.sh"
+  #run_if_exists "${profile_hooks_dir}/post-feeds-install.sh"
 
   copy_dir_if_exists "${PROFILE_DIR}/files" "${OPENWRT_ROOT}/files"
   copy_file_if_exists "${PROFILE_DIR}/.config" "${OPENWRT_ROOT}/.config"
