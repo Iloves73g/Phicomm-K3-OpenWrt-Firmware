@@ -35,26 +35,16 @@ collect_firmware() {
   local firmware_dir
   firmware_dir="$(resolve_firmware_dir)"
 
-  # 1. 進入 bin 目錄準備提取 IPK
-  cd "${OPENWRT_ROOT}/bin"
-  mkdir -p "collected_packages"
-  
-  # 2. 搜尋並複製所有編譯出來的 .ipk (包括 K3 Screen)
-  # 這樣會保留驅動包和界面包
-  find packages/ targets/ -name "*.ipk" -exec cp {} "collected_packages/" \;
-
-  # 3. 回到固件目錄，但不要刪除 packages 目錄 (或者改為移動到我們剛建的文件夾)
   cd "$firmware_dir"
-  # rm -rf packages  <-- 註釋掉或刪除這一行，防止它刪除包
+  rm -rf packages
 
   local artifact_name="openwrt-${PROFILE_ID}-${FILE_DATE}"
 
-  # 4. 重新定義環境變量，讓 YAML 上傳整個 collected_packages 目錄
-  append_env "FIRMWARE_DIR" "${OPENWRT_ROOT}/bin/collected_packages"
-  append_env "ARTIFACT_NAME" "${artifact_name}-packages"
+  append_env "FIRMWARE_DIR" "$firmware_dir"
+  append_env "ARTIFACT_NAME" "$artifact_name"
 
-  log_info "IPK Collection dir: ${OPENWRT_ROOT}/bin/collected_packages"
-  log_info "Artifact name: ${artifact_name}-packages"
+  log_info "Firmware dir: $firmware_dir"
+  log_info "Artifact name: $artifact_name"
 
   group_end
 }
